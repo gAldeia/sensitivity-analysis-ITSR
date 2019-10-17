@@ -96,7 +96,7 @@ class ITES:
 
     def _create_init_pop(self):
         
-        pop = [Individual(self.fitfun, self.func_set, label=self.label) 
+        pop = [Individual(self.fitfun, self.func_set, self.expolim, self.max_terms, label=self.label) 
                for _ in range(self.pop_len)]
         
         return pop
@@ -117,7 +117,7 @@ class ITES:
 
     def _apply_mutation(self, pop):
                 
-        pool = Pool(nodes=4)
+        pool = Pool(nodes=8)
                 
         args = [(self.func_set, self.fitfun, self.label, sol) for sol in pop]
         mutated_pop = pool.map(Evol_operators.mutation, args)

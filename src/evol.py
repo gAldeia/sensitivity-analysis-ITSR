@@ -17,17 +17,24 @@ class Evol_operators:
 
     @staticmethod
     def _mut_add(it, func_set):
-        term = [np.random.choice(3) for _ in range(len(it.terms[0]))]        
+        
+        expolim = Evol_operators.expolim
+
+        #Faz a criação dentro dos limites de expolim
+        term = np.random.randint(-expolim, expolim + 1, size=len(it.terms[0])).tolist()        
         it.add_term(term, func_set[np.random.choice(len(func_set))])
             
         return it
 
     @staticmethod
     def _mut_term(it, func_set):
+
+        expolim = Evol_operators.expolim
+        
         chosen_term = np.random.choice(it.len)
 
         newt, newf = it.get_term(chosen_term)
-        newt[np.random.choice(len(newt))] = np.random.choice(4)
+        newt[np.random.choice(len(newt))] = np.random.randint(-expolim, expolim + 1)
 
         it.remove_term(chosen_term)
         it.add_term(newt, newf)
@@ -98,7 +105,7 @@ class Evol_operators:
         if it.len == 0:
             return sol.copy()
         else:
-            ind = Individual(fit_fun, func_set, it, label)
+            ind = Individual(fit_fun, func_set, Evol_operators.expolim, Evol_operators.max_nof_terms, it, label)
             return ind
 
     @staticmethod
@@ -122,7 +129,7 @@ class Evol_operators:
 
         it = IT(picked_t, picked_f, label) if len(picked_t)!= 0 else None
 
-        ind = Individual(fit_fun, func_set, it, label)
+        ind = Individual(fit_fun, func_set, Evol_operators.expolim, Evol_operators.max_nof_terms, it, label)
 
         # print("---")
         # print(it1.it.to_str())

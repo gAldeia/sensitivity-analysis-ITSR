@@ -74,8 +74,8 @@ class IT:
 
         if all(ti==0 for ti in term):
             if len(self.terms) == 0:
-                #adicionar um novo aleatório até conseguir um que não seja nulo
-                self.add_term([np.random.choice(3) for _ in term], func)
+                #adicionar um novo aleatório até conseguir um que não seja nulo, com expoentes entre 0 e 1
+                self.add_term(np.random.randint(0, 2, size=len(term)).tolist(), func)
                 
             return self
 
@@ -125,3 +125,13 @@ class IT:
         clone.intercept = self.intercept
         
         return clone
+
+    def get_key(self):
+
+        # Transforma sua expressão em uma chave de dicionário
+
+        funcs = list(map(lambda x:x[0], self.funcs))
+
+        sorted_terms = [f'{f}-{t}' for _, f, t in sorted(zip(self.coeffs, funcs, self.terms), key=lambda tup: tup[0])]
+
+        return '_'.join(sorted_terms)

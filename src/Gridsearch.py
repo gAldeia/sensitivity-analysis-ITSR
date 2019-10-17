@@ -1,11 +1,13 @@
 #própria classe de gridsearch criada por mim
 
+#sudo code --user-data-dir="~/.vscode-root"
+
 import numpy  as np
 import pandas as pd
-import ites   as sr 
+import ites   as sr
 
 import os.path
-import glob 
+import glob
 import re
 import time
 import collections  #Dicionários que se lembram da ordem de inserção
@@ -13,6 +15,10 @@ import collections  #Dicionários que se lembram da ordem de inserção
 from sklearn   import linear_model, metrics
 from itertools import product
 
+# suprimir aquele monte de aviso do numpy (a classe Fitness cuida de atribuir um
+# fitness ruim para que os indivíduos com erro grande não ganhem competições)
+#https://docs.scipy.org/doc/numpy/reference/generated/numpy.seterr.html
+np.seterr(all='ignore')
 
 #Definindo as métricas que vamos utilizar
 def MAE(it, X, y):
@@ -29,7 +35,7 @@ def NMSE(it, X, y):
 
 
 #OBS: não interromper o script bem no finalzinho de uma evolução, é o momento
-#onde ele começa a salvar vários .csv com as informações,e pode quebrar
+#onde ele começa a salvar vários .csv com as informações, e pode quebrar
 
 # ONDE AS INFORMAÇÕES SÃO SALVAS: ----------------------------------------------
 #evolution log:
@@ -41,11 +47,6 @@ def NMSE(it, X, y):
 #resultsregression:
 #   - guarda o resultado do melhor indivíduo do gridsearch para cada base-fold-rep
 
-#TODO: -------------------------------------------------------------------------
-#criar um ipynotebook para plotar os gráficos de
-#   - convergência, dada uma configuração (utilizar a média do melhor RMSE
-#     para cada geração)
-#   - classificação dos algoritmos (usando o mesmo método do PGC)
 
 #Nosso método precisa responder as seguintes perguntas: ------------------------
 #   - existe um conjunto de parâmetros fixos que sempre (ou quase sempre) domina todos os outros?
@@ -80,16 +81,16 @@ class Gridsearch_ITES:
         
         #Parâmetros fixados, serão usados em todos
         self._default_params = {
-            'pop_len' : 25, #500,
-            'gens'    : 25, #1000,
+            'pop_len' : 100, #500,
+            'gens'    : 300, #1000,
             'funcs'   : [
-                ("id"       , lambda x: x),
-                ("sin"      , np.sin), 
-                ("cos"      , np.cos),        
-                ("tanh"     , np.tanh),
-                ("sqrt.abs" , np.sqrt),
-                ("log"      , np.log), 
-                ("exp"      , np.exp),
+                ("id"      , lambda x: x),
+                ("sin"     , np.sin), 
+                ("cos"     , np.cos),        
+                ("tanh"    , np.tanh),
+                ("sqrt.abs", lambda x: np.sqrt(np.absolute(x))),
+                ("log"     , np.log), 
+                ("exp"     , np.exp),
             ]
         }
 
@@ -167,21 +168,21 @@ class Gridsearch_ITES:
 
                 for key, value in hp.items():
                     searchDF = searchDF[searchDF[key]==value]  
-
-                print(searchDF) 
                     
                 if len(searchDF)==1:
                     rmse_test = searchDF['rmse_test'].values
                     mae_test  = searchDF['mae_test'].values
                     nmse_test = searchDF['nmse_test'].values
                     expr      = searchDF['expr'].values
-
-                    print('alread done')
                 
                     self._tested_params[tuple(hp.items())] = rmse_test
                     self._tested_return[tuple(hp.items())] = (rmse_test, mae_test, nmse_test, expr)
                 
+                    print(f'(Gridsearch) already evaluated configuration {hp}')
+                    
                     continue
+            
+            print(f'(Gridsearch) evaluating configuration {hp}')
 
             ites    = self._create_regressor(**hp)
             bestsol = self._eval(ites, X_train, y_train, X_test, y_test)
@@ -282,8 +283,13 @@ if __name__ == '__main__':
         resultsDF = pd.read_csv(fname)
         results   = resultsDF.to_dict('list')
 
+    # pastas para os logs:
+    if not os.path.exists('grid_log'):
+        os.makedirs('grid_log')
+    if not os.path.exists('evolution_log'):
+        os.makedirs('evolution_log')
+
     for ds in datasets:
-        print(ds)
         for fold in range(5):
             dataset = np.loadtxt(f'../datasets/{ds}-train-{fold}.dat', delimiter=',')
             Xtrain, ytrain = dataset[:, :-1], dataset[:, -1]
@@ -298,13 +304,16 @@ if __name__ == '__main__':
                     resultsDF = pd.read_csv(fname)
                     results   = resultsDF.to_dict('list')
 
-                    #Evitando refazer repetidos e possibilitando retomar o teste
+                    #Evitando refazer repetidos e possibilita retomar o teste
                     if len(resultsDF[
                             (resultsDF['dataset']==ds) &
                             (resultsDF['Fold']==fold)  &
                             (resultsDF['Rep']==rep)])==1:
-                        print("already done")
+                        print(f'already done gridsearch for {ds}-{fold}-{rep}')
+                        
                         continue
+
+                print(f'performing gridsearch for {ds}-{fold}-{rep}')
 
                 grid = Gridsearch_ITES(f'{ds}-{fold}-{rep}')
 
@@ -321,7 +330,7 @@ if __name__ == '__main__':
                 results['NMSE_test'].append(nmse_test)
                 results['RMSE_test'].append(rmse_test)
                 results['MAE_test'].append(mae_test)
-                results['Time'].append(tot_time)  #Tempo do gridsearch!
+                results['Time'].append(tot_time)  #Tempo do gridsearch, não de cada uma!
                 results['Expression'].append(expr)
                 results['Fold'].append(fold)
                 results['Rep'].append(rep)
@@ -330,4 +339,3 @@ if __name__ == '__main__':
                 df.to_csv(fname, index=False)
 
     print('done')
-
