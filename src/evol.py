@@ -3,22 +3,22 @@ import numpy as np
 from it import IT
 from individual import Individual
 
-#Evol_operators é uma classe estática apenas para agrupar os métodos
 class Evol_operators:
-    expolim = 10
-    min_nof_terms = 1
-    max_nof_terms = 10
+    def __init__(self, expolim=10, min_nof_terms=1, max_nof_terms=10):
+        self.expolim = expolim
+        self.min_nof_terms = min_nof_terms
+        self.max_nof_terms = max_nof_terms
 
-    @staticmethod
-    def _mut_drop(it, func_set):
+    
+    def _mut_drop(self, it, func_set):
         it.remove_term(np.random.choice(it.len))
 
         return it
 
-    @staticmethod
-    def _mut_add(it, func_set):
+    
+    def _mut_add(self, it, func_set):
         
-        expolim = Evol_operators.expolim
+        expolim = self.expolim
 
         #Faz a criação dentro dos limites de expolim
         term = np.random.randint(-expolim, expolim + 1, size=len(it.terms[0])).tolist()        
@@ -26,10 +26,10 @@ class Evol_operators:
             
         return it
 
-    @staticmethod
-    def _mut_term(it, func_set):
+    
+    def _mut_term(self, it, func_set):
 
-        expolim = Evol_operators.expolim
+        expolim = self.expolim
         
         chosen_term = np.random.choice(it.len)
 
@@ -41,8 +41,8 @@ class Evol_operators:
         
         return it
 
-    @staticmethod
-    def _mut_func(it, func_set):
+    
+    def _mut_func(self, it, func_set):
         chosen_term = np.random.choice(it.len)
 
         newt, newf = it.get_term(chosen_term)
@@ -52,51 +52,53 @@ class Evol_operators:
         
         return it
 
-    @staticmethod
-    def _mut_interp(it, func_set):
+    
+    def _mut_interp(self, it, func_set):
         term1_index = np.random.choice(it.len)
         term2_index = np.random.choice(it.len)
 
         newt, newf = it.get_term(term1_index)
         for i, exp in enumerate(it.terms[term2_index]):
-            newt[i] = (newt[i]+exp)%Evol_operators.expolim * (-1 if newt[i]+exp>=0 else 1)
+            newt[i] = (newt[i]+exp)%self.expolim * (-1 if newt[i]+exp>=0 else 1)
             
         it.add_term(newt, newf)
             
         return it
 
-    @staticmethod
-    def _mut_intern(it, func_set):
+    
+    def _mut_intern(self, it, func_set):
         term1_index = np.random.choice(it.len)
         term2_index = np.random.choice(it.len)
 
         newt, newf = it.get_term(term1_index)
         for i, exp in enumerate(it.terms[term2_index]):
-            newt[i] = (newt[i]-exp)%Evol_operators.expolim * (-1 if newt[i]-exp>=0 else 1)
+            newt[i] = (newt[i]-exp)%self.expolim * (-1 if newt[i]-exp>=0 else 1)
             
         it.add_term(newt, newf)
             
         return it
 
-    @staticmethod
-    def mutation(args):
+    
+    def mutation(self, args):
 
         func_set, fit_fun, label, sol = args
         it = sol.it.copy()
         
         mutations = {
-            'term' : Evol_operators._mut_term,
-            'func' : Evol_operators._mut_func
+            'term' : self._mut_term,
+            'func' : self._mut_func
         }
 
-        if it.len>Evol_operators.min_nof_terms:
-            mutations.update({'drop' : Evol_operators._mut_drop})
+        #print(f'mutação. maxterms={self.max_nof_terms}, expolim={self.expolim}')
 
-        if it.len<Evol_operators.max_nof_terms:
+        if it.len>self.min_nof_terms:
+            mutations.update({'drop' : self._mut_drop})
+
+        if it.len<self.max_nof_terms:
             mutations.update({
-                'add'    : Evol_operators._mut_add,
-                'intern' : Evol_operators._mut_intern,
-                'interp' : Evol_operators._mut_interp,
+                'add'    : self._mut_add,
+                'intern' : self._mut_intern,
+                'interp' : self._mut_interp,
             })
 
         mutation = np.random.choice(list(mutations))
@@ -105,11 +107,11 @@ class Evol_operators:
         if it.len == 0:
             return sol.copy()
         else:
-            ind = Individual(fit_fun, func_set, Evol_operators.expolim, Evol_operators.max_nof_terms, it, label)
+            ind = Individual(fit_fun, func_set, self.expolim, self.max_nof_terms, it, label)
             return ind
 
-    @staticmethod
-    def crossover(func_set, fit_fun, label, it1, it2, rate):
+    
+    def crossover(self, func_set, fit_fun, label, it1, it2, rate):
 
         t1, f1 = it1.it.terms, it1.it.funcs
         t2, f2 = it1.it.terms, it1.it.funcs
@@ -129,7 +131,7 @@ class Evol_operators:
 
         it = IT(picked_t, picked_f, label) if len(picked_t)!= 0 else None
 
-        ind = Individual(fit_fun, func_set, Evol_operators.expolim, Evol_operators.max_nof_terms, it, label)
+        ind = Individual(fit_fun, func_set, self.expolim, self.max_nof_terms, it, label)
 
         # print("---")
         # print(it1.it.to_str())

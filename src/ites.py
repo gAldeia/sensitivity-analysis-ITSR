@@ -36,12 +36,14 @@ class ITES:
 
     def run(self, X, Y):
 
-        #Configurando a classe de operadores evolutivos
-        Evol_operators.expolim       = self.expolim
-        Evol_operators.min_nof_terms = 1
-        Evol_operators.max_nof_terms = self.max_terms
+        self.fitfun  = Fitness(X, Y)
+        self.evolops = Evol_operators(self.expolim, 1, self.max_terms)
 
-        self.fitfun = Fitness(X, Y)
+        #print('new run')
+        #print('evol expolim', self.evolops.expolim)
+        #print('evol max_terms', self.evolops.max_nof_terms)
+        #print('self expolim', self.expolim)
+        #print('self max_terms', self.max_terms)
 
         self.pop = self._create_init_pop()
 
@@ -120,7 +122,7 @@ class ITES:
         pool = Pool(nodes=8)
                 
         args = [(self.func_set, self.fitfun, self.label, sol) for sol in pop]
-        mutated_pop = pool.map(Evol_operators.mutation, args)
+        mutated_pop = pool.map(self.evolops.mutation, args)
 
         #mutated_pop = [mutation(arg) for arg in args]
         
@@ -135,7 +137,7 @@ class ITES:
         for _ in range(len(pop)):
             p1, p2 = self._apply_tourn_sel(self.pop, ftournament, 2)
 
-            child = Evol_operators.crossover(self.func_set, self.fitfun, self.label, p1, p2, rate)
+            child = self.evolops.crossover(self.func_set, self.fitfun, self.label, p1, p2, rate)
             cross.append(child)
 
         return cross
