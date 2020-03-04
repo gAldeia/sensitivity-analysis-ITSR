@@ -1,10 +1,7 @@
 import numpy as np
-import pandas as pd
 
 from sklearn.linear_model import LinearRegression 
 
-# Rodando o cProfile:
-# python3 -m cProfile -s tottime itea.py > output.txt 
 
 # Para executar a checagem de tipos: mypy --ignore-missing-imports itea.py 
 # (requer os módulos typing, nptyping e mypy, facilmente instalados via pip).
@@ -33,12 +30,6 @@ np.seterr(all='ignore')
 # métodos fit (que ajustam os parâmetros internos) e predict. Como adicional, a classe ITExpr permite imprimir a expressão
 # resultante de forma mais legível.
 class ITExpr:
-
-    # Variável de classe para compartilharem um dicionário
-    # com o score para evitar muitos evals
-    _memory = dict()
-
-    # os its são devem receber uma lista de termos para criar a classe. A ideia é não criar expressões com termos inválidos
     def __init__(self, ITs: IT, funcList: FuncsList, labels: List[str] = []) -> None:
         
         # Variáveis que não são modificadas após criação de uma instância
@@ -54,8 +45,8 @@ class ITExpr:
         # Variáveis que são modificadas com fit
         self.bias    : float     = 0.0
         self.coeffs  : Coeffs    = np.ones(self.len)
-        self.fitness : float     = np.inf
-
+        self.err     : float     = np.inf
+        #TODO: trocarr err por fitness?
 
     def __str__(self) -> str:
         terms_str = [] 
@@ -79,40 +70,32 @@ class ITExpr:
 
 
     def _eval(self, X: List[List[float]]) -> List[List[float]]:
-
         Z = np.zeros( (len(X), self.len) )
 
         for i, (ni, fi) in enumerate( zip(self.terms, self.funcs) ):
-            #Z[:, i] = [self.funcList[fi](z) for z in Z[:, i]]
-            Z[:, i] = self.funcList[fi](np.prod(X**ni, axis=1))
+            Z[:, i] = np.prod(X**ni, axis=1)
+            Z[:, i] = [self.funcList[fi](z) for z in Z[:, i]]
 
         return Z
 
 
     def fit(self, model, X: List[List[float]], y: List[float]) -> Union[float, None]:
 
-        key = b''.join([t.tostring() + str.encode(f) for t, f in zip(self.terms, self.funcs)])
+        # Deve receber um modelo com função fit e predict, e que tenha
+        # como atributos os coeficientes e intercepto (ou seja, modelo linear)
+        # Retorna uma expressão fitada
+        Z = self._eval(X)
+
+        if np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300):
+            return None
         
-        if key not in ITExpr._memory:
-            # Deve receber um modelo com função fit e predict, e que tenha
-            # como atributos os coeficientes e intercepto (ou seja, modelo linear)
-            # Retorna uma expressão fitada
-            Z = self._eval(X)
+        model.fit(Z, y)
 
-            assert not (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)), \
-                'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.'
-            
-            model.fit(Z, y)
+        self.coeffs = model.coef_.tolist()
+        self.bias   = model.intercept_
+        self.err    = np.sqrt(np.square(model.predict(Z) - y).mean())
 
-            ITExpr._memory[key] = (
-                model.coef_.tolist(),
-                model.intercept_,
-                np.sqrt(np.square(model.predict(Z) - y).mean())
-            )
-
-        self.coeffs, self.bias, self.fitness = ITExpr._memory[key] 
-
-        return self.fitness
+        return self.err
 
 
     def predict(self, X: List[List[float]]) -> float:
@@ -120,8 +103,8 @@ class ITExpr:
         return np.dot(self._eval(X), self.coeffs) + self.bias
 
 
-
 class MutationIT:
+
     def __init__(self, minterms: int, maxterms: int, nvars: int, expolim: int, funcsList: FuncsList) -> None:
         self.minterms = minterms
         self.maxterms = maxterms
@@ -130,26 +113,23 @@ class MutationIT:
         self.funs     = funcsList
 
         self.singleITGenerator = _randITBuilder(1, 1, nvars, expolim, funcsList)
-    
-        # Será garantido que as mutações internas só serão chamadas se elas puderem retornar uma IT.
-        # Além disso, nenhuma mutação modifica os argumentos passados
 
-
+    # Será garantido que as mutações internas só serão chamadas se elas puderem retornar uma IT.
+    # Além disso, nenhuma mutação modifica os argumentos passados
     def _mut_drop(self, ITs: IT) -> IT:
         terms, funcs = ITs
 
         index = np.random.randint(0, len(terms))
         mask = [True if i is not index else False for i in range(len(terms))]
 
+        # TODO: checar se isso retorna cópia
         return (terms[mask], funcs[mask])
-
 
     def _mut_add(self, ITs: IT) -> IT:
         terms, funcs = ITs
         newt,  newf  = next(self.singleITGenerator)
         
         return ( np.concatenate((terms, newt)), np.concatenate((funcs, newf)) )
-
 
     def _mut_term(self, ITs: IT) -> IT:
         terms, funcs = ITs
@@ -160,7 +140,6 @@ class MutationIT:
 
         return (terms, funcs)
 
-
     def _mut_func(self, ITs: IT) -> IT:
         terms, funcs = ITs
 
@@ -169,7 +148,6 @@ class MutationIT:
         funcs[np.random.randint(0, len(funcs))] = newf[0]
 
         return (terms, funcs)
-
 
     def _mut_interp(self, ITs: IT) -> IT:
         terms, funcs = ITs
@@ -183,7 +161,6 @@ class MutationIT:
         newt[newt > self.expolim]  = self.expolim
         
         return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
-
 
     def _mut_intern(self, ITs: IT) -> IT:
         terms, funcs = ITs
@@ -218,9 +195,8 @@ class MutationIT:
 
         return _partially
 
-
     def mutate(self, ITs: IT) -> IT:
-        mutations = { #(probabilidade, função de mutação)
+        mutations = {
             'term' : self._mut_term,
             'func' : self._mut_func
         }
@@ -245,7 +221,7 @@ class MutationIT:
 
 
 # Lista infinita com termos aleatórios
-def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: int, funs: FuncsList) -> IT:
+def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: int, funcsList: FuncsList) -> IT:
     while True:
         nterms = np.random.randint(minterms, maxterms + 1)
 
@@ -255,144 +231,63 @@ def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: int, funs:
         yield (terms, funcs)
 
 
-# Não é feito dentro da IT pois queremos que elas sejam criadas válidas, 
-# ao invés de checar no construtor. A ideia é não criar uma IT sem limpar os termos antes,
-# para garantir que nada será criado sem nenhum termo
 def sanitizeIT(ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
+    terms, funcs = ITs
 
     def isInvalid(t, f, X):
-        key = t.tostring() + str.encode(f)
-        
-        if key not in sanitizeIT._memory:   
-            Z = funcsList[f](np.prod(X**t, axis=1))
+        Z = np.prod(X**t, axis=1)
+        Z = np.array([funcsList[f](z) for z in Z])
 
-            sanitizeIT._memory[key] = np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)
-        
-        return sanitizeIT._memory[key]
-    
+        return np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)
+
     # Se em algum momento não houver mais termos, o zip(* ... ) vai lançar um ValueError
     try:
-        terms_funcs = []
-        for t, f in zip(ITs[0], ITs[1]):
-            if np.any(t!=0):
-                # Pelos testes preliminares, tirar termos repetidos faz com que
-                # o tempo aumente consideravelmente, mas a convergência é muito
-                # melhor
-                for t2, f2 in terms_funcs:
-                    if (f == f2) and np.all(t == t2):
-                        continue
+        # Pega somente termos não repetidos
+        #terms, funcs = zip(* list(set(zip(terms, funcs))) )
 
-                terms_funcs.append((t, f))
+        # Removendo aqueles com todos os termos iguais a zero
+        terms, funcs = zip(* [(t, f) for t, f in zip(terms, funcs) if np.all(t!=0)] )
 
         # Removendo os que não fitam
-        terms, funcs = zip(*[(t, f) for t, f in terms_funcs if not isInvalid(t, f, X)])
-
-        return (np.array(terms), np.array(funcs))
-
+        terms, funcs = zip(* [(t, f) for t, f in zip(terms, funcs) if not isInvalid(t, f, X)] )
     except:
         return None
 
-# Dicionário para memorizar termos inválidos
-sanitizeIT._memory = dict()
+    return (np.array(terms), np.array(funcs))
 
+def createRandPop(popsize, minterms, maxterms, nvars, expolim, funs, Xtrain, ytrain, model) -> List[IT]:
+    randITGenerator = _randITBuilder(minterms, maxterms, nvars, expolim, funs)
+    
+    pop = []
 
-class ITEA:
-    def __init__(self, funs, minterms, maxterms, model, expolim, popsize, gens):
-        self.funs     = funs
-        self.minterms = minterms
-        self.maxterms = maxterms
-        self.model    = model
-        self.expolim  = expolim
-        self.popsize  = popsize
-        self.gens     = gens
-        
+    # Garantir que a população terá o mesmo tamanho que foi passado
+    while len(pop) < popsize:
+        itxClean = sanitizeIT(next(randITGenerator), funs, Xtrain)
 
-    def _generate_random_pop(self) -> List[IT]:
-        randITGenerator = _randITBuilder(self.minterms, self.maxterms, self.nvars, self.expolim, self.funs)
-        
-        pop = []
-
-        # Garantir que a população terá o mesmo tamanho que foi passado
-        while len(pop) < self.popsize:
-            itxClean = sanitizeIT(next(randITGenerator), self.funs, self.Xtrain)
-
-            if itxClean:
-                itexpr = ITExpr(itxClean, self.funs)
-                itexpr.fit(self.model, self.Xtrain, self.ytrain)
-            
-                pop.append(itexpr)
-        
-        return pop
-
-
-    def _mutate(self, ind) -> List[IT]:
-
-        itxClean = sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain)
-        
         if itxClean:
-            itexpr = ITExpr(itxClean, self.funs)
-            itexpr.fit(self.model, self.Xtrain, self.ytrain)
-
-            return itexpr
-
-        return None 
-
-
-    def run(self, Xtrain, ytrain, log=None, verbose=False):
-        self.Xtrain = Xtrain
-        self.ytrain = ytrain
-        self.nvars  = len(Xtrain[0])
-        self.mutate = MutationIT(2, 10, self.nvars, self.expolim, self.funs)
-
-        if log != None:
-            results = {c:[] for c in ['gen', 'bestfit', 'pmean', 'plen']}  
+            itexpr = ITExpr(itxClean, funs)
+            score  = itexpr.fit(model, Xtrain, ytrain)
         
-        ftournament = lambda x, y: x if x.fitness < y.fitness else y
+            if score:
+                pop.append(itexpr)
+    
+    return pop
 
-        pop = self._generate_random_pop()
-
-        if verbose:
-            print('gen\tbest fitness\tmean fitness\tmean length')
-
-        for g in range(self.gens):
-            pop = pop + list(filter(None, [self._mutate(ind) for ind in pop]))
-
-            pop = [ftournament(*np.random.choice(pop, 2)) for _ in range(self.popsize)] 
-            
-            if verbose:
-                best  = min(pop, key= lambda itexpr: itexpr.fitness)
-                pmean, plen = np.mean([(itexpr.fitness, itexpr.len) for itexpr in pop], axis=0)
-
-                if log != None:
-                    results['gen'].append(g)
-                    results['bestfit'].append(best.fitness)
-                    results['pmean'].append(pmean)
-                    results['plen'].append(plen)
-                    
-                print(f'{g}/{self.gens}\t{best.fitness}\t{pmean}\t{plen}')
-
-        self.best = min(pop, key= lambda itexpr: itexpr.fitness)
-        
-        if log != None:
-            df = pd.DataFrame(results)
-            df.to_csv(log, index=False)
-
-        return self.best
-
+def mutatePop() -> List[IT]:
+    pass
 
 # ---------------------------------------------------------------------------------
 if __name__ == '__main__':
 
-    # Exemplo de uso da regressão simbólica
     funs: FuncsList = { # Funções devem ser unárias, f:R -> R
-        'sin'      : np.sin,
-        'cos'      : np.cos,
-        'tan'      : np.tan,
-        'abs'      : np.abs,
-        'id'       : lambda x: x,
-        'sqrt.abs' : lambda x: np.sqrt(np.absolute(x)),
-        'exp'      : lambda x: np.exp(300) if x>=300 else np.exp(x),
-        'log'      : lambda x: 0 if x<=0 else np.log(x)
+        'sin'  : np.sin,
+        'cos'  : np.cos,
+        'tan'  : np.tan,
+        'abs'  : np.abs,
+        'id'   : lambda x: x,
+        'sqrt' : lambda x: 0 if x<0 else np.sqrt(x),
+        'exp'  : lambda x: np.exp(300) if x>=300 else np.exp(x),
+        'log'  : lambda x: 0 if x<=0 else np.log(x)
     }
 
     # Parâmetros para criar uma ITExpr
@@ -404,11 +299,39 @@ if __name__ == '__main__':
     popsize  = 100
     gens     = 100
 
+
     dataset = np.loadtxt(f'../datasets/airfoil-train-0.dat', delimiter=',')
     Xtrain, ytrain = dataset[:, :-1], dataset[:, -1]
 
-    symbreg = ITEA(funs, minterms, maxterms, model, expolim, popsize, gens)
-    best    = symbreg.run(Xtrain, ytrain, log='./res.csv', verbose=True)
-
     dataset = np.loadtxt(f'../datasets/airfoil-test-0.dat', delimiter=',')
     Xtest, ytest = dataset[:, :-1], dataset[:, -1]
+
+
+    pop = createRandPop(popsize, minterms, maxterms, nvars, expolim, funs, Xtrain, ytrain, model)
+
+    mutate = MutationIT(2, 10, nvars, expolim, funs)
+
+    ftournament = lambda x, y: x if x.err < y.err else y
+
+    def mutate_sanitized(ind, funs, Xtrain):
+        itxClean = sanitizeIT(mutate.mutate((ind.terms, ind.funcs)), funs, Xtrain)
+        
+        if itxClean:
+            itexpr = ITExpr(itxClean, funs)
+            score  = itexpr.fit(model, Xtrain, ytrain)
+
+            return itexpr if score else None
+
+        return None 
+        
+    for g in range(gens):
+        childs = list(filter(None, [mutate_sanitized(ind, funs, Xtrain) for ind in pop]))
+
+        pop = pop + childs
+
+        pop = [ftournament(*np.random.choice(pop, 2)) for _ in range(popsize)] 
+  
+        meanErr, meanLen = np.mean([(itexpr.err, itexpr.len) for itexpr in pop], axis=0)
+        best = min(pop, key= lambda itexpr: itexpr.err)
+
+        print(g, best.err, meanErr, meanLen)
