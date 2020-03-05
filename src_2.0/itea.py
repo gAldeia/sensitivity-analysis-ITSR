@@ -342,7 +342,7 @@ class ITEA:
         self.Xtrain = Xtrain
         self.ytrain = ytrain
         self.nvars  = len(Xtrain[0])
-        self.mutate = MutationIT(2, 10, self.nvars, self.expolim, self.funs)
+        self.mutate = MutationIT(self.minterms, self.maxterms, self.nvars, self.expolim, self.funs)
 
         if log != None:
             results = {c:[] for c in ['gen', 'bestfit', 'pmean', 'plen']}  
