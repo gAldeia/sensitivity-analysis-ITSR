@@ -179,8 +179,8 @@ class MutationIT:
 
         newt = terms[term1_index] + terms[term2_index]
 
-        newt[newt < -self.expolim] = -self.expolim
-        newt[newt > self.expolim]  = self.expolim
+        newt[newt < -self.expolim[0]] = -self.expolim[0]
+        newt[newt > self.expolim[1]]  = self.expolim[1]
         
         return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
 
@@ -193,8 +193,8 @@ class MutationIT:
 
         newt = terms[term1_index] - terms[term2_index]
 
-        newt[newt < -self.expolim] = -self.expolim
-        newt[newt > self.expolim]  = self.expolim
+        newt[newt < -self.expolim[0]] = -self.expolim[0]
+        newt[newt > self.expolim[1]]  = self.expolim[1]
         
         return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
 
@@ -211,8 +211,8 @@ class MutationIT:
 
             newt = np.array([combf(terms[term1_index][i], terms[term2_index][i]) for i in range(self.nvars)])
 
-            newt[newt < -self.expolim] = -self.expolim
-            newt[newt > self.expolim]  = self.expolim
+            newt[newt < -self.expolim[0]] = -self.expolim[0]
+            newt[newt > self.expolim[1]]  = self.expolim[1]
             
             return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
 
@@ -245,11 +245,11 @@ class MutationIT:
 
 
 # Lista infinita com termos aleatórios
-def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: int, funs: FuncsList) -> IT:
+def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int], funs: FuncsList) -> IT:
     while True:
         nterms = np.random.randint(minterms, maxterms + 1)
 
-        terms: Terms = np.random.randint(-expolim, expolim + 1, size=(nterms, nvars)) 
+        terms: Terms = np.random.randint(expolim[0], expolim[1] + 1, size=(nterms, nvars)) 
         funcs: Funcs = np.random.choice(list(funs.keys()), size=nterms)
 
         yield (terms, funcs)
@@ -400,7 +400,7 @@ if __name__ == '__main__':
     minterms = 2
     maxterms = 10
     model    = LinearRegression(n_jobs=-1)
-    expolim  = 3
+    expolim  = (-1, 3)
     popsize  = 100
     gens     = 100
 

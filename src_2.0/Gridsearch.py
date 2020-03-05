@@ -89,7 +89,7 @@ class Gridsearch_ITES:
         }
 
         self._search_params  = {
-            'expolim'  : [1, 2, 3, 4, 5],  #obs: se expolim = x, range é [-x, x]
+            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)],  #obs: se expolim = x, range é [-x, x]
             'maxterms' : [2, 4, 6, 8, 10],
 
         }
