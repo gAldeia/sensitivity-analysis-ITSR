@@ -287,6 +287,8 @@ def sanitizeIT(ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
         # Removendo os que não fitam
         terms, funcs = zip(*[(t, f) for t, f in terms_funcs if not isInvalid(t, f, X)])
 
+        if len(terms)==0 or len(funcs)==0:
+            return None    
         return (np.array(terms), np.array(funcs))
 
     except:
