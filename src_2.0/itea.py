@@ -322,12 +322,10 @@ class ITEA:
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
-                try:
-                    itexpr.fit(self.model, self.Xtrain, self.ytrain)
-                    pop.append(itexpr)
-                except:
-                    continue
-    
+                
+                itexpr.fit(self.model, self.Xtrain, self.ytrain)
+                pop.append(itexpr)
+            
         return pop
 
 
@@ -337,12 +335,10 @@ class ITEA:
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
-            try:
-                itexpr.fit(self.model, self.Xtrain, self.ytrain)
-                return itexpr
-            except:
-                return None
-
+        
+            itexpr.fit(self.model, self.Xtrain, self.ytrain)
+            return itexpr
+        
         return None 
 
 

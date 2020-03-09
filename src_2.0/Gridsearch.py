@@ -136,7 +136,7 @@ class Gridsearch_ITES:
 
     def _eval(self, ites, X_train, y_train, X_test, y_test, logfile):
         
-        bestsol = ites.run(X_train, y_train, log=logfile, verbose=True)
+        bestsol = ites.run(X_train, y_train, log=logfile, verbose=False)
         #ITES só salva o log no final, pois não faz sentido retomar uma evolução no meio
         #Ainda, ele sobrescreve um arquivo se já existir com esse nome, para atu-
         #alizar a execução.
