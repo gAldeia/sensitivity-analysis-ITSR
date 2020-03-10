@@ -41,6 +41,8 @@ class ITExpr:
     # os its são devem receber uma lista de termos para criar a classe. A ideia é não criar expressões com termos inválidos
     def __init__(self, ITs: IT, funcList: FuncsList, labels: List[str] = []) -> None:
         
+        assert len(ITs[0])>0 and len(ITs[1])>0, 'Criando ITExpr sem passar termos'
+
         # Variáveis que não são modificadas após criação de uma instância
         self.terms: Terms
         self.funcs: Funcs
@@ -92,7 +94,12 @@ class ITExpr:
     def fit(self, model, X: List[List[float]], y: List[float]) -> Union[float, None]:
 
         key = b''.join([t.tostring() + str.encode(f) for t, f in zip(self.terms, self.funcs)])
-        
+
+        key_t = b''.join([t.tostring() for t in self.terms])
+        key_f = b''.join([f.encode()   for f in self.funcs])
+
+        key = (key_t, key_f)
+
         if key not in ITExpr._memory:
             # Deve receber um modelo com função fit e predict, e que tenha
             # como atributos os coeficientes e intercepto (ou seja, modelo linear)
@@ -363,17 +370,18 @@ class ITEA:
 
             pop = [ftournament(*np.random.choice(pop, 2)) for _ in range(self.popsize)] 
             
-            if verbose:
-                best  = min(pop, key= lambda itexpr: itexpr.fitness)
-                pmean, plen = np.mean([(itexpr.fitness, itexpr.len) for itexpr in pop], axis=0)
+            best  = min(pop, key= lambda itexpr: itexpr.fitness)
+            pmean, plen = np.mean([(itexpr.fitness, itexpr.len) for itexpr in pop], axis=0)
 
-                if log != None:
-                    results['gen'].append(g)
-                    results['bestfit'].append(best.fitness)
-                    results['pmean'].append(pmean)
-                    results['plen'].append(plen)
-                    
+            if verbose:
                 print(f'{g}/{self.gens}\t{best.fitness}\t{pmean}\t{plen}')
+                
+            if log:
+                results['gen'].append(g)
+                results['bestfit'].append(best.fitness)
+                results['pmean'].append(pmean)
+                results['plen'].append(plen)
+                    
 
         self.best = min(pop, key= lambda itexpr: itexpr.fitness)
         
