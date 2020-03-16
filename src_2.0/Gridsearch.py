@@ -89,7 +89,7 @@ class Gridsearch_ITES:
         }
 
         self._search_params  = {
-            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)], 
+            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)],
             'maxterms' : [2, 4, 6, 8, 10],
         }
         
@@ -135,7 +135,10 @@ class Gridsearch_ITES:
 
     def _eval(self, ites, X_train, y_train, X_test, y_test, logfile):
         
+        # Essa é a parte demorada do gridsearch
+
         bestsol = ites.run(X_train, y_train, log=logfile, verbose=True)
+
         #ITES só salva o log no final, pois não faz sentido retomar uma evolução no meio
         #Ainda, ele sobrescreve um arquivo se já existir com esse nome, para atu-
         #alizar a execução.
@@ -159,8 +162,8 @@ class Gridsearch_ITES:
                 searchDF = pd.read_csv('./grid_log/' + self.name + '.csv')
 
                 for key, value in hp.items():
-                    searchDF = searchDF[searchDF[key]==value]  
-                    
+                    searchDF = searchDF[searchDF[key].astype(str)==str(value)]
+                
                 if len(searchDF)==1:
                     rmse_test = searchDF['rmse_test'].values
                     mae_test  = searchDF['mae_test'].values
@@ -177,8 +180,11 @@ class Gridsearch_ITES:
             print(f'(Gridsearch) evaluating configuration {hp}')
 
             ites, logfile = self._create_regressor(**hp)
-            bestsol       = self._eval(ites, X_train, y_train, X_test, y_test, logfile)
 
+            start    = time.time()    
+            bestsol  = self._eval(ites, X_train, y_train, X_test, y_test, logfile)
+            tot_time = time.time() - start
+            
             rmse_test = RMSE(bestsol, X_test, y_test)
             mae_test  = MAE(bestsol, X_test, y_test)
             nmse_test = NMSE(bestsol, X_test, y_test)
@@ -186,7 +192,7 @@ class Gridsearch_ITES:
             expr = str(bestsol)
 
             #Salva para poder retomar depois
-            self._save_csv(hp, rmse_test, mae_test, nmse_test, expr)
+            self._save_csv(hp, rmse_test, mae_test, nmse_test, expr, tot_time)
 
             #transforma os hyperparâmetros testados em tuplas para poderem
             #ser utilizadas como key no dicionário. Posteriormente fica mais
@@ -226,18 +232,18 @@ class Gridsearch_ITES:
 
         print('-- best final result --')
         print("parameters: " + str(self.best_params))
-        print("score: " + str(self.best_score))
+        print("score:      " + str(self.best_score))
         print("-------------------------")
 
 
-    def _save_csv(self, tested, rmse_test, mae_test, nmse_test, expr):
+    def _save_csv(self, tested, rmse_test, mae_test, nmse_test, expr, time):
 
         #salvar os resultados num arquivo.
         #irá salvar os parâmetros (apenas os que foram variados) e adicionará
         #uma última coluna com o valor da métrica
 
         columns = [key for key in self._search_params.keys()] +\
-                  ['rmse_test', 'mae_test', 'nmse_test', 'expr']
+                  ['rmse_test', 'mae_test', 'nmse_test', 'time', 'expr']
 
         results = {c:[] for c in columns}
 
@@ -254,6 +260,7 @@ class Gridsearch_ITES:
         results['mae_test'].append(mae_test)
         results['nmse_test'].append(nmse_test)
         results['expr'].append(expr)
+        results['time'].append(time)
 
         df = pd.DataFrame(results)
         df.to_csv(fname, index=False)

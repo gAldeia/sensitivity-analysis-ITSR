@@ -41,6 +41,8 @@ class ITExpr:
     # os its são devem receber uma lista de termos para criar a classe. A ideia é não criar expressões com termos inválidos
     def __init__(self, ITs: IT, funcList: FuncsList, labels: List[str] = []) -> None:
         
+        assert len(ITs[0])>0 and len(ITs[1])>0, 'Criando ITExpr sem passar termos'
+
         # Variáveis que não são modificadas após criação de uma instância
         self.terms: Terms
         self.funcs: Funcs
@@ -92,7 +94,12 @@ class ITExpr:
     def fit(self, model, X: List[List[float]], y: List[float]) -> Union[float, None]:
 
         key = b''.join([t.tostring() + str.encode(f) for t, f in zip(self.terms, self.funcs)])
-        
+
+        key_t = b''.join([t.tostring() for t in self.terms])
+        key_f = b''.join([f.encode()   for f in self.funcs])
+
+        key = (key_t, key_f)
+
         if key not in ITExpr._memory:
             # Deve receber um modelo com função fit e predict, e que tenha
             # como atributos os coeficientes e intercepto (ou seja, modelo linear)
@@ -154,21 +161,28 @@ class MutationIT:
     def _mut_term(self, ITs: IT) -> IT:
         terms, funcs = ITs
 
-        newt, _ = next(self.singleITGenerator)
-        terms = np.copy(terms)
-        terms[np.random.randint(0, len(terms))] = newt[0]
+        index = np.random.randint(0, len(terms))
 
-        return (terms, funcs)
+        newt, _ = next(self.singleITGenerator)
+        newf = [funcs[index]]
+
+        mask = [True if i is not index else False for i in range(len(terms))]
+
+        return ( np.concatenate((terms[mask], newt)), np.concatenate((funcs[mask], newf)) )
 
 
     def _mut_func(self, ITs: IT) -> IT:
         terms, funcs = ITs
 
-        _, newf = next(self.singleITGenerator)
-        funcs = np.copy(funcs)
-        funcs[np.random.randint(0, len(funcs))] = newf[0]
+        index = np.random.randint(0, len(terms))
 
-        return (terms, funcs)
+        _, newf = next(self.singleITGenerator)
+        newt = [terms[index]]
+
+        mask = [True if i is not index else False for i in range(len(terms))]
+
+        return ( np.concatenate((terms[mask], newt)), np.concatenate((funcs[mask], newf)) )
+
 
 
     def _mut_interp(self, ITs: IT) -> IT:
@@ -243,7 +257,6 @@ class MutationIT:
         return mutations[np.random.choice(list(mutations.keys()))](ITs)
 
 
-
 # Lista infinita com termos aleatórios
 def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int], funs: FuncsList) -> IT:
     while True:
@@ -260,37 +273,35 @@ def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int]
 # para garantir que nada será criado sem nenhum termo
 def sanitizeIT(ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
 
-    def isInvalid(t, f, X):
-        key = t.tostring() + str.encode(f)
-        
-        if key not in sanitizeIT._memory:   
-            Z = funcsList[f](np.prod(X**t, axis=1))
+    t_list, f_list = [], []
 
-            sanitizeIT._memory[key] = np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)
-        
-        return sanitizeIT._memory[key]
-    
-    # Se em algum momento não houver mais termos, o zip(* ... ) vai lançar um ValueError
-    try:
-        terms_funcs = []
-        for t, f in zip(ITs[0], ITs[1]):
-            if np.any(t!=0):
-                # Pelos testes preliminares, tirar termos repetidos faz com que
-                # o tempo aumente consideravelmente, mas a convergência é muito
-                # melhor
-                for t2, f2 in terms_funcs:
-                    if (f == f2) and np.all(t == t2):
-                        continue
+    for t, f in zip(ITs[0], ITs[1]):
+        assert f in funcsList.keys(), f'{f} não é uma função válida'
 
-                terms_funcs.append((t, f))
+        if np.any(t!=0):
+            # Pelos testes preliminares, tirar termos repetidos faz com que
+            # o tempo aumente consideravelmente, mas a convergência é muito
+            # melhor
+            for t2, f2 in zip(t_list, f_list):
+                if (f == f2) and np.all(t == t2):
+                    continue
 
-        # Removendo os que não fitam
-        terms, funcs = zip(*[(t, f) for t, f in terms_funcs if not isInvalid(t, f, X)])
+            key = (t.tostring(), f.encode())
+            if key not in sanitizeIT._memory:   
+                Z = funcsList[f](np.prod(X**t, axis=1))
 
-        return (np.array(terms), np.array(funcs))
+                sanitizeIT._memory[key] = np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)
+            
+            if sanitizeIT._memory[key]:
+                continue
 
-    except:
+            t_list.append(t)
+            f_list.append(f)
+
+    if len(t_list)==0 or len(f_list)==0:
         return None
+
+    return (np.array(t_list), np.array(f_list))
 
 # Dicionário para memorizar termos inválidos
 sanitizeIT._memory = dict()
@@ -318,10 +329,10 @@ class ITEA:
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
+                
                 itexpr.fit(self.model, self.Xtrain, self.ytrain)
-            
                 pop.append(itexpr)
-        
+            
         return pop
 
 
@@ -331,10 +342,10 @@ class ITEA:
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
+        
             itexpr.fit(self.model, self.Xtrain, self.ytrain)
-
             return itexpr
-
+        
         return None 
 
 
@@ -359,17 +370,18 @@ class ITEA:
 
             pop = [ftournament(*np.random.choice(pop, 2)) for _ in range(self.popsize)] 
             
-            if verbose:
-                best  = min(pop, key= lambda itexpr: itexpr.fitness)
-                pmean, plen = np.mean([(itexpr.fitness, itexpr.len) for itexpr in pop], axis=0)
+            best  = min(pop, key= lambda itexpr: itexpr.fitness)
+            pmean, plen = np.mean([(itexpr.fitness, itexpr.len) for itexpr in pop], axis=0)
 
-                if log != None:
-                    results['gen'].append(g)
-                    results['bestfit'].append(best.fitness)
-                    results['pmean'].append(pmean)
-                    results['plen'].append(plen)
-                    
+            if verbose:
                 print(f'{g}/{self.gens}\t{best.fitness}\t{pmean}\t{plen}')
+                
+            if log:
+                results['gen'].append(g)
+                results['bestfit'].append(best.fitness)
+                results['pmean'].append(pmean)
+                results['plen'].append(plen)
+                    
 
         self.best = min(pop, key= lambda itexpr: itexpr.fitness)
         
