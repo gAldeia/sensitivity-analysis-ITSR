@@ -89,9 +89,8 @@ class Gridsearch_ITES:
         }
 
         self._search_params  = {
-            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)],  #obs: se expolim = x, range é [-x, x]
+            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)], 
             'maxterms' : [2, 4, 6, 8, 10],
-
         }
         
         #Nome do arquivo para salvar o log do gridsearch.
