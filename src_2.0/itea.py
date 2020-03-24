@@ -35,7 +35,7 @@ np.seterr(all='ignore')
 class ITExpr:
 
     # Variável de classe para compartilharem um dicionário
-    # com o score para evitar muitos evals
+    # com o score para evitar muitos evals (DEVE ser resetado se mudar o dataset)
     _memory = dict()
 
     # os its são devem receber uma lista de termos para criar a classe. A ideia é não criar expressões com termos inválidos
@@ -107,7 +107,7 @@ class ITExpr:
             Z = self._eval(X)
 
             assert not (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)), \
-                'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.'
+                f'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.\n{self.terms}\n{self.funcs}\n{self.coeffs}'
             
             model.fit(Z, y)
 
@@ -268,45 +268,6 @@ def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int]
         yield (terms, funcs)
 
 
-# Não é feito dentro da IT pois queremos que elas sejam criadas válidas, 
-# ao invés de checar no construtor. A ideia é não criar uma IT sem limpar os termos antes,
-# para garantir que nada será criado sem nenhum termo
-def sanitizeIT(ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
-
-    t_list, f_list = [], []
-
-    for t, f in zip(ITs[0], ITs[1]):
-        assert f in funcsList.keys(), f'{f} não é uma função válida'
-
-        if np.any(t!=0):
-            # Pelos testes preliminares, tirar termos repetidos faz com que
-            # o tempo aumente consideravelmente, mas a convergência é muito
-            # melhor
-            for t2, f2 in zip(t_list, f_list):
-                if (f == f2) and np.all(t == t2):
-                    continue
-
-            key = (t.tostring(), f.encode())
-            if key not in sanitizeIT._memory:   
-                Z = funcsList[f](np.prod(X**t, axis=1))
-
-                sanitizeIT._memory[key] = np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)
-            
-            if sanitizeIT._memory[key]:
-                continue
-
-            t_list.append(t)
-            f_list.append(f)
-
-    if len(t_list)==0 or len(f_list)==0:
-        return None
-
-    return (np.array(t_list), np.array(f_list))
-
-# Dicionário para memorizar termos inválidos
-sanitizeIT._memory = dict()
-
-
 class ITEA:
     def __init__(self, funs, minterms, maxterms, model, expolim, popsize, gens):
         self.funs     = funs
@@ -316,7 +277,38 @@ class ITEA:
         self.expolim  = expolim
         self.popsize  = popsize
         self.gens     = gens
-        
+                
+        # Dicionário para memorizar termos inválidos (DEVE ser resetado sempre que mudar a base de dados)
+        self._memory = dict()
+
+
+    # Não é feito dentro da IT pois queremos que elas sejam criadas válidas, 
+    # ao invés de checar no construtor. A ideia é não criar uma IT sem limpar os termos antes,
+    # para garantir que nada será criado sem nenhum termo
+    def _sanitizeIT(self, ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
+
+        terms, funcs = ITs[0], ITs[1]
+
+        mask = np.full( len(ITs[0]), False )
+
+        for i, (t, f) in enumerate(zip(terms, funcs)):
+            assert f in funcsList.keys(), f'{f} não é uma função válida'
+
+            if np.any(t!=0):
+                for t2, f2 in zip(terms[mask], funcs[mask]):
+                    if (f == f2) and np.all(t == t2):
+                        continue
+
+                key = (t.tobytes(), f)
+                if key not in self._memory:   
+                    Z = funcsList[f](np.prod(X**t, axis=1))
+
+                    self._memory[key] = (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300))
+                
+                mask[i] = not self._memory[key]
+
+        return (terms[mask], funcs[mask]) if np.any(mask) else None
+
 
     def _generate_random_pop(self) -> List[IT]:
         randITGenerator = _randITBuilder(self.minterms, self.maxterms, self.nvars, self.expolim, self.funs)
@@ -325,7 +317,7 @@ class ITEA:
 
         # Garantir que a população terá o mesmo tamanho que foi passado
         while len(pop) < self.popsize:
-            itxClean = sanitizeIT(next(randITGenerator), self.funs, self.Xtrain)
+            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain)
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
@@ -338,7 +330,7 @@ class ITEA:
 
     def _mutate(self, ind) -> List[IT]:
 
-        itxClean = sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain)
+        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain)
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
@@ -350,10 +342,16 @@ class ITEA:
 
 
     def run(self, Xtrain, ytrain, log=None, verbose=False):
-        self.Xtrain = Xtrain
-        self.ytrain = ytrain
-        self.nvars  = len(Xtrain[0])
-        self.mutate = MutationIT(self.minterms, self.maxterms, self.nvars, self.expolim, self.funs)
+        
+        # Limpa a memorização, que guarda valores de fitness e ajustes de termos
+        # de acordo com a base Xtrain ytrain utilizada
+        ITExpr._memory = dict()
+        self._memory = dict()
+
+        self.Xtrain  = Xtrain
+        self.ytrain  = ytrain
+        self.nvars   = len(Xtrain[0])
+        self.mutate  = MutationIT(self.minterms, self.maxterms, self.nvars, self.expolim, self.funs)
 
         if log != None:
             results = {c:[] for c in ['gen', 'bestfit', 'pmean', 'plen']}  
@@ -382,7 +380,6 @@ class ITEA:
                 results['pmean'].append(pmean)
                 results['plen'].append(plen)
                     
-
         self.best = min(pop, key= lambda itexpr: itexpr.fitness)
         
         if log != None:

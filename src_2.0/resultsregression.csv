@@ -1,0 +1,2 @@
+dataset,best_params,RMSE_test,NMSE_test,MAE_test,Time,Expression,Fold,Rep
+airfoil,"{'expolim': (-2, 2), 'maxterms': 8}",3.0027536422344143,2.1430495978879898,0.0005746555786297975,662.2768399715424,-1.377*sqrt.abs(x0^-2 * x2^-2 * x3^2) + -36.973*sqrt.abs(x0^-2 * x3 * x4^-1) + 13.084*(x0^-2 * x1^2 * x2 * x3 * x4^-1) + -0.054*sqrt.abs(x0^2 * x2 * x3 * x4^2) + 0.001*sqrt.abs(x0^2 * x1^2 * x2^2 * x3^2 * x4^2) + -0.608*tanh(x0^2 * x1 * x3^2) + -17379.84*sqrt.abs(x0^-1 * x3^-1 * x4^2) + 15.765*tanh(x0^-2 * x2^-1 * x3^2 * x4^-1) + 120.565,0,0
