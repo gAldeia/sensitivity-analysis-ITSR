@@ -73,9 +73,8 @@ class Gridsearch_ITES:
         
         #Parâmetros fixados, serão usados em todos
         self._default_params = {
-            'popsize'  : 100, #500,
-            'gens'     : 100, #1000,
-            'minterms' : 1,
+            'popsize'  : 200,
+            'gens'     : 500,
             'model'    : linear_model.LinearRegression(n_jobs=-1),
             'funs'     : {
                 "id"      : lambda x: x,
@@ -89,8 +88,9 @@ class Gridsearch_ITES:
         }
 
         self._search_params  = {
-            'expolim'  : [(-1, 1), (-2, 2), (-3, 3), (-4, 4), (-5, 5)],
-            'maxterms' : [2, 4, 6, 8, 10],
+            'expolim'  : [(-3, 3), (-2, 2), (-1, 1), (0, 3), (0, 2), (0, 1)],
+            'maxterms' : [5, 10, 15],
+            'minterms' : [3, 4, 5]
         }
         
         #Nome do arquivo para salvar o log do gridsearch.
@@ -296,7 +296,7 @@ if __name__ == '__main__':
             dataset = np.loadtxt(f'../datasets/{ds}-test-{fold}.dat', delimiter=',')
             Xtest, ytest = dataset[:, :-1], dataset[:, -1]
             
-            for rep in range(6): #Número de execuções por fold
+            for rep in range(1): #Número de execuções por fold
 
                 if os.path.isfile(fname):
                     #Abre o arquivo e carrega caso ele exista

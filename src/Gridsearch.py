@@ -4,7 +4,7 @@
 
 import numpy  as np
 import pandas as pd
-import ites   as sr
+import itea   as sr
 
 import os.path
 import glob
@@ -97,8 +97,8 @@ class Gridsearch_ITES:
         }
 
         self._search_params  = {
-            'expolim'   : [1, 2, 3, 4, 5],  #obs: se expolim = x, range é [-x, x]
-            'max_terms' : [2, 4, 6, 8, 10]
+            'degree_range' : [1, 2, 3, 4, 5],  #obs: se degree_range = x, range é [-x, x]
+            'max_terms'    : [2, 4, 6, 8, 10]
         }
         
         #Nome do arquivo para salvar o log do gridsearch.
@@ -136,12 +136,12 @@ class Gridsearch_ITES:
 
         logfile = f'evolution_log/{self.name}-{sufix}.csv'
 
-        ites = sr.ITES(log=logfile, **_params)
+        ites = sr.ITEA(log=logfile, **_params)
 
         return ites
 
 
-    def _eval(self, ites, X_train, y_train, X_test, y_test):
+    def _eval(self, ites, X_train, y_train):
         
         ites.run(X_train, y_train)
         #ITES só salva o log no final, pois não faz sentido retomar uma evolução no meio
@@ -187,7 +187,7 @@ class Gridsearch_ITES:
             print(f'(Gridsearch) evaluating configuration {hp}')
 
             ites    = self._create_regressor(**hp)
-            bestsol = self._eval(ites, X_train, y_train, X_test, y_test)
+            bestsol = self._eval(ites, X_train, y_train)
 
             rmse_test = RMSE(bestsol.it, X_test, y_test)
             mae_test  = MAE(bestsol.it, X_test, y_test)

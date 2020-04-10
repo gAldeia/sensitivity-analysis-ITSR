@@ -106,16 +106,23 @@ class ITExpr:
             # Retorna uma expressão fitada
             Z = self._eval(X)
 
-            assert not (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)), \
-                f'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.\n{self.terms}\n{self.funcs}\n{self.coeffs}'
+            #assert not (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)), \
+            #    f'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.\n{self.terms}\n{self.funcs}\n{self.coeffs}'
             
-            model.fit(Z, y)
+            if (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)):
+                ITExpr._memory[key] = (
+                    np.ones(self.len),
+                    0.0,
+                    1e+100
+                )
+            else:
+                model.fit(Z, y)
 
-            ITExpr._memory[key] = (
-                model.coef_.tolist(),
-                model.intercept_,
-                np.sqrt(np.square(model.predict(Z) - y).mean())
-            )
+                ITExpr._memory[key] = (
+                    model.coef_.tolist(),
+                    model.intercept_,
+                    np.sqrt(np.square(model.predict(Z) - y).mean())
+                )
 
         self.coeffs, self.bias, self.fitness = ITExpr._memory[key] 
 
@@ -193,7 +200,7 @@ class MutationIT:
 
         newt = terms[term1_index] + terms[term2_index]
 
-        newt[newt < -self.expolim[0]] = -self.expolim[0]
+        newt[newt < self.expolim[0]] = self.expolim[0]
         newt[newt > self.expolim[1]]  = self.expolim[1]
         
         return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
@@ -207,7 +214,7 @@ class MutationIT:
 
         newt = terms[term1_index] - terms[term2_index]
 
-        newt[newt < -self.expolim[0]] = -self.expolim[0]
+        newt[newt < self.expolim[0]] = self.expolim[0]
         newt[newt > self.expolim[1]]  = self.expolim[1]
         
         return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
@@ -225,7 +232,7 @@ class MutationIT:
 
             newt = np.array([combf(terms[term1_index][i], terms[term2_index][i]) for i in range(self.nvars)])
 
-            newt[newt < -self.expolim[0]] = -self.expolim[0]
+            newt[newt < self.expolim[0]] = self.expolim[0]
             newt[newt > self.expolim[1]]  = self.expolim[1]
             
             return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
@@ -285,27 +292,34 @@ class ITEA:
     # Não é feito dentro da IT pois queremos que elas sejam criadas válidas, 
     # ao invés de checar no construtor. A ideia é não criar uma IT sem limpar os termos antes,
     # para garantir que nada será criado sem nenhum termo
-    def _sanitizeIT(self, ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
+    def _sanitizeIT(self, ITs: IT, funcsList, X: List[List[float]], check_fit=True) -> Union[IT, None]:
+
+        # check fit é para determinar se ele vai tentar fazer um fit e remover termos que tem NaN
+        # durante o fit com a base passada
 
         terms, funcs = ITs[0], ITs[1]
 
         mask = np.full( len(ITs[0]), False )
 
-        for i, (t, f) in enumerate(zip(terms, funcs)):
+        # Removendo termos repetidos
+        _, unique_ids = np.unique(np.column_stack((terms, funcs)), return_index=True, axis=0)
+
+        for unique_id in unique_ids:
+            t, f = terms[unique_id], funcs[unique_id]
+
             assert f in funcsList.keys(), f'{f} não é uma função válida'
 
             if np.any(t!=0):
-                for t2, f2 in zip(terms[mask], funcs[mask]):
-                    if (f == f2) and np.all(t == t2):
-                        continue
+                if check_fit:
+                    key = (t.tobytes(), f)
+                    if key not in self._memory:   
+                        Z = funcsList[f](np.prod(X**t, axis=1))
 
-                key = (t.tobytes(), f)
-                if key not in self._memory:   
-                    Z = funcsList[f](np.prod(X**t, axis=1))
-
-                    self._memory[key] = (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300))
-                
-                mask[i] = not self._memory[key]
+                        self._memory[key] = (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300))
+                    
+                    mask[unique_id] = not self._memory[key]
+                else:
+                    mask[unique_id] = True
 
         return (terms[mask], funcs[mask]) if np.any(mask) else None
 
@@ -317,7 +331,7 @@ class ITEA:
 
         # Garantir que a população terá o mesmo tamanho que foi passado
         while len(pop) < self.popsize:
-            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain)
+            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain, False)
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
@@ -330,7 +344,7 @@ class ITEA:
 
     def _mutate(self, ind) -> List[IT]:
 
-        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain)
+        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain, False)
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
