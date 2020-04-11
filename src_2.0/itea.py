@@ -331,7 +331,7 @@ class ITEA:
 
         # Garantir que a população terá o mesmo tamanho que foi passado
         while len(pop) < self.popsize:
-            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain, False)
+            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain, True)
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
@@ -344,7 +344,7 @@ class ITEA:
 
     def _mutate(self, ind) -> List[IT]:
 
-        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain, False)
+        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain, True)
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
