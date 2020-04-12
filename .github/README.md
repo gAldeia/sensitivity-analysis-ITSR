@@ -3,7 +3,7 @@ Sensitivity Analysis of Interaction-Transformation Evolutionary Algorithm for Sy
 
 Repository containing the code for performing and saving a sensitivity analysis of the hyper-parameters for the algorithm based on the Interaction-Transformation (IT) representation, as well as a python notebook to plot results helping visualizing the results.
 
-The aim is to answer questions about the hyper-parameters, and propose a method to quantify the answer of the following:
+The aim is to answer the following questions:
 
   * Does exist an unique set of fixed parameters that frequently dominates other combinations?
   * Are goodness-of-fit and size of the model conflicting objectives?
@@ -21,7 +21,12 @@ Aldeia, G. S. I. and de França, F. O. (2020). A parametric study of interactrio
 Installation and Usage
 ------
 
-Clone or download this repository. The original version used for the paper is inside __/src/__, and a newer version (allowing the adjust of more parameters and within one file) is in __/src_2.0/__. Below there's Instructions of how to use the ITEA for the __src__ and the __src_2.0__ versions.
+Clone or download this repository. The original version (used in the paper) is in the __./src/__ folder.
+
+A newer version is in __./src_2.0/__.
+
+Below there's Instructions of how to use the ITEA for both versions.
+
 
 ### Symbolic Regression
 
@@ -55,13 +60,13 @@ funcs        = [ #list of tuples, containing (func name, function)
 # create a lambda function to map it to an array)
 
 itea = sr.ITEA(
-    pop_len      = pop_len,      #the size of the population of each generation
-    gens         = gens,         #the number of generations
-    funcs        = funcs,        #the transformation functions to be used
-    degree_range = degree_range, #max and min degree allowed in the IT,
-    max_terms    = max_terms,    #maximum number of terms allowed,
-    label        = [],           #labels to the features of the problem,
-    log          = None          #file name to save the evolution log
+    pop_len      = pop_len,      # size of the population
+    gens         = gens,         # number of generations
+    funcs        = funcs,        # transformation functions to be used
+    degree_range = degree_range, # max and min degree allowed in the IT,
+    max_terms    = max_terms,    # maximum number of terms allowed,
+    label        = [],           # labels to the features of the problem,
+    log          = None          # file name to save the evolution log
 )
 
 X, y = datasets.load_diabetes(return_X_y=True)
@@ -82,9 +87,13 @@ print(pred, y[0:2])
 print(best_function.fitness)
 ```
 
-The version 2.0 allows the configuration of the degree range and the maximum and minimum number of terms in a more flexible way than the original version. In this usage example, we will create an dictionary of the parameters, instead of creating each one individually. Also, you can pass the model used to adjust the coefficients (should be a model that returns the coefficients and the bias as the linear models from sklearn do). There are some minor differences between the parameters (i.e. the transformation functions list). The version 2.0 uses numpy arrays more intensively to provide a better performance, although it does not use pathos to allow multiprocessing (but the old version presents bugs when using the linear model with mutiple jobs, while the newer version doesn't have this limitation). A performance comparision between the two versions is planned.
+The version 2.0 allows the configuration of the degree range and the maximum and minimum number of terms in a more flexible way than the original version. In this usage example, we will create an dictionary of the parameters, instead of creating each one individually. 
 
-Although python does not support type check, in version 2.0, the libraries typing and nptyping are used to provide clearer explanation of the code.
+Also, you can pass the model used to adjust the coefficients (should be a model that returns the coefficients and the bias, as the linear models from sklearn does).
+
+There are some minor differences between the parameters (i.e. the transformation functions list). The version 2.0 uses numpy arrays more intensively to provide a better performance, although it does not use pathos for multiprocessing (the old versiond does, but shows bugs when using the linear model with mutiple jobs, while the newer version doesn't have this limitation). A performance comparision between the two versions is planned.
+
+Although python does not support type check, in version 2.0, the libraries _typing_ and _nptyping_ are used to provide clearer explanation of the code.
 
 ```python
 import itea  as sr
@@ -134,12 +143,12 @@ print(best_function.fitness)
 
 ### Gridsearch
 
-To execute the experimental setup used in the paper, just run the /src/Gridsearch.py with a python at version 3.7 or higher. The code is made to be able to continue tests if an execution is interrupted, based on the saved files:
-- __(FOLDER) /evolution_log/__:
+To execute the experimental setup used in the paper, just run the __./src/Gridsearch.py__ with a python at version 3.7 or higher. The code is made to be able to continue tests if an execution is interrupted, based on the saved files:
+- (FOLDER) __/evolution_log/__:
     - Save files that are used to plot convergence graphics;
-- __(FOLDER) /grid_log/__:
+- (FOLDER) __/grid_log/__:
     - Save information about every combination of hyper-parameters being tested for each dataset
-- __(FILE) resultsregression.csv__:
+- (FILE) __resultsregression.csv__:
     - Saves the best result found for each dataset, on each fold, on each repetition.
     
     
@@ -175,7 +184,3 @@ The following libraries are used in the code:
 | pathos      | -        |
 | -           | typing   |
 | -           | nptyping |
-
-
-License
-------
