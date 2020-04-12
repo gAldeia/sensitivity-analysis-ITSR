@@ -1,6 +1,3 @@
-#reminder:  sudo python3.5 -m pip install [package]
-#upgrading: sudo python3.5 -m pip install [package] --upgrade
-
 import re  # Regular expressions for string formatting
 
 from copy import deepcopy #create copies to apply mutation 
@@ -31,6 +28,7 @@ class IT:
         else:
             self.labels = labels
 
+
     def _eval(self, X):
         # Evaluates the ITs for a given point (Internal use)
 
@@ -51,7 +49,6 @@ class IT:
     def to_str(self):
         # Returns a string representing the expression.
 
-        #BOTAR UM LIST COMPREHENSION AQUI, FICA MAIS LEGÍVEL 
         coeffs = list(map(lambda x:str(round(x,6)), self.coeffs))
         funcs  = list(map(lambda x:x[0], self.funcs))
 
@@ -74,7 +71,7 @@ class IT:
 
         if all(ti==0 for ti in term):
             if len(self.terms) == 0:
-                #adicionar um novo aleatório até conseguir um que não seja nulo, com expoentes entre 0 e 1
+                # Persistently tries to create a random where any(ti!=0)
                 self.add_term(np.random.randint(0, 2, size=len(term)).tolist(), func)
                 
             return self
@@ -126,9 +123,10 @@ class IT:
         
         return clone
 
-    def get_key(self):
 
-        # Transforma sua expressão em uma chave de dicionário
+    def get_key(self):
+        # Transforms the expression into a key to be used in dictionaries
+        # when memorizing values.
 
         funcs = list(map(lambda x:x[0], self.funcs))
 

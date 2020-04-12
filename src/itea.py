@@ -8,14 +8,10 @@ from sklearn.linear_model import LinearRegression
 import os.path
 import pandas as pd
 
-from it import IT
-from fitness import Fitness
-from evol import Evol_operators
+from it         import IT
+from fitness    import Fitness
+from evol       import Evol_operators
 from individual import Individual
-
-
-#todo: métodos internos do ITES (com '_') não alteram a self.pop, e sim a pop 
-# passada como parâmetro
 
 
 class ITEA:
@@ -38,14 +34,7 @@ class ITEA:
 
         self.fitfun  = Fitness(X, Y)
         self.evolops = Evol_operators(self.degree_range, 1, self.max_terms)
-
-        #print('new run')
-        #print('evol degree_range', self.evolops.degree_range)
-        #print('evol max_terms', self.evolops.max_nof_terms)
-        #print('self degree_range', self.degree_range)
-        #print('self max_terms', self.max_terms)
-
-        self.pop = self._create_init_pop()
+        self.pop     = self._create_init_pop()
 
         for g in range(self.gens):
 
@@ -122,8 +111,8 @@ class ITEA:
         pool = Pool(nodes=8)
                 
         args = [(self.func_set, self.fitfun, self.label, sol) for sol in pop]
+        
         mutated_pop = pool.map(self.evolops.mutation, args)
-
         #mutated_pop = [mutation(arg) for arg in args]
         
         return mutated_pop

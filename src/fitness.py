@@ -16,8 +16,9 @@ class Fitness:
         Z = it._eval(self.X)
 
         if np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300):
+            
             #return 1e+300, np.ones(self.X.shape[1]), 0.0
-            return 1e+300, np.ones(it.len), 0.0 #notificar pro fabrício!
+            return 1e+300, np.ones(it.len), 0.0 
         
         self._model.fit(Z, self.y)
         y_hat = self._model.predict(Z)

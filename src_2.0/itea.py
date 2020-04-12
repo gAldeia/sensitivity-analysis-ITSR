@@ -3,47 +3,43 @@ import pandas as pd
 
 from sklearn.linear_model import LinearRegression 
 
-# Rodando o cProfile:
-# python3 -m cProfile -s tottime itea.py > output.txt 
-
-# Para executar a checagem de tipos: mypy --ignore-missing-imports itea.py 
-# (requer os módulos typing, nptyping e mypy, facilmente instalados via pip).
-# O desenvolvimento dessas ferramentas ainda está em progresso, e temos várias discussões e implementações
-# sendo feitas no momento. Atualmente (fev/2020), o mypy não suporta checagem para o numpy, então as anotações
-# nesse código servem apenas para organização (e hinting em algumas IDEs).
-
 from typing   import Dict, Callable, List, Tuple, Union
-from nptyping import Array #https://pypi.org/project/nptyping/, typing dedicado a arrays numpy
+from nptyping import Array 
 
-#TODO: UNIFICAR: FUNS, FUNCSLIST, FUNCLIST, QUAL AFINAL?
+# To run type checking (still in development): mypy --ignore-missing-imports itea.py 
+# (this requires typing, nptyping and mypy)
+# The development of those tools are work in progress. At this moment (fev/2020), 
+# mypy doesn't support type checking for numpy arrays. This way, the types specified in
+# this code are just for better understandment of how the code works.
 
-# Definição de tipos
+
 FuncsList = Dict[str, Callable]
 MutatList = Dict[str, Callable]
 Funcs     = List[str]
 Terms     = List[List[int]]
 Coeffs    = List[float]
 IT        = Tuple[Terms, Funcs]
-    
+
+
+# Hiding warning messages that can occur during the evolution, since expressions
+# for complex datasets can present NaN in specific cases.   
 np.seterr(all='ignore')
     
-# Uma it é uma tupla com termos e funções.
-# uma ITExpr é uma classe para guardar uma it e informações associadas à ela (score, tamanho, bias, coeficientes).
-# alem disso, a ITExpr procura facilitar o uso de algumas funcionalidades comuns aos modelos de regressão do scikit:
-# métodos fit (que ajustam os parâmetros internos) e predict. Como adicional, a classe ITExpr permite imprimir a expressão
-# resultante de forma mais legível.
-class ITExpr:
 
-    # Variável de classe para compartilharem um dicionário
-    # com o score para evitar muitos evals (DEVE ser resetado se mudar o dataset)
+class ITExpr:
+    # Class to represent an Interaction-Transformation (IT) function.
+    # This class stores an IT, informations regarding the stored IT
+    # (score, length, bias, coefficients), and provide fit() and predict() methods.
+
+    # Memorization of scores, coefficients and bias
     _memory = dict()
 
-    # os its são devem receber uma lista de termos para criar a classe. A ideia é não criar expressões com termos inválidos
+
     def __init__(self, ITs: IT, funcList: FuncsList, labels: List[str] = []) -> None:
         
-        assert len(ITs[0])>0 and len(ITs[1])>0, 'Criando ITExpr sem passar termos'
+        assert len(ITs[0])>0 and len(ITs[1])>0, 'Terms or Funcs has len = 0'
 
-        # Variáveis que não são modificadas após criação de uma instância
+        # Below are variables that any method changes after creating a instance
         self.terms: Terms
         self.funcs: Funcs
 
@@ -53,13 +49,26 @@ class ITExpr:
         self.funcList: FuncsList = funcList
         self.len     : int       = len(self.terms)
 
-        # Variáveis que são modificadas com fit
+        # Variables that are changed by the fit()
         self.bias    : float     = 0.0
         self.coeffs  : Coeffs    = np.ones(self.len)
         self.fitness : float     = np.inf
 
 
+    def _eval(self, X: List[List[float]]) -> List[List[float]]:
+
+        Z = np.zeros( (len(X), self.len) )
+
+        for i, (ni, fi) in enumerate( zip(self.terms, self.funcs) ):
+            #Z[:, i] = [self.funcList[fi](z) for z in Z[:, i]]
+            Z[:, i] = self.funcList[fi](np.prod(X**ni, axis=1))
+
+        return Z
+
+
     def __str__(self) -> str:
+        # Overriding the str representation to print with a pretty formatation
+
         terms_str = [] 
 
         for c, f, t in zip(self.coeffs, self.funcs, self.terms):
@@ -80,18 +89,9 @@ class ITExpr:
         return expr_str  + ("" if self.bias == 0.0 else f' + {round(self.bias, 3)}')
 
 
-    def _eval(self, X: List[List[float]]) -> List[List[float]]:
-
-        Z = np.zeros( (len(X), self.len) )
-
-        for i, (ni, fi) in enumerate( zip(self.terms, self.funcs) ):
-            #Z[:, i] = [self.funcList[fi](z) for z in Z[:, i]]
-            Z[:, i] = self.funcList[fi](np.prod(X**ni, axis=1))
-
-        return Z
-
-
     def fit(self, model, X: List[List[float]], y: List[float]) -> Union[float, None]:
+
+        # Uses a linear model from scikit learn to adjust the coefficients and bias
 
         key = b''.join([t.tostring() + str.encode(f) for t, f in zip(self.terms, self.funcs)])
 
@@ -101,13 +101,10 @@ class ITExpr:
         key = (key_t, key_f)
 
         if key not in ITExpr._memory:
-            # Deve receber um modelo com função fit e predict, e que tenha
-            # como atributos os coeficientes e intercepto (ou seja, modelo linear)
-            # Retorna uma expressão fitada
             Z = self._eval(X)
 
             #assert not (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)), \
-            #    f'Um ou mais termos apresentaram NaN/inf durante o fit. Verifique se as ITs passadas foram "limpadas" antes.\n{self.terms}\n{self.funcs}\n{self.coeffs}'
+            #    f'One or more Terms presented NaN/inf during the fit.'
             
             if (np.isinf(Z).any() or np.isnan(Z).any() or np.any(Z > 1e+300) or np.any(Z < -1e+300)):
                 ITExpr._memory[key] = (
@@ -131,11 +128,20 @@ class ITExpr:
 
     def predict(self, X: List[List[float]]) -> float:
 
+        # Takes a list of x values to predict, and return a list
+        # of predicted values (for a single value, you should
+        # encapsulate it inside a list)
+
         return np.dot(self._eval(X), self.coeffs) + self.bias
 
 
 
 class MutationIT:
+    # Class to hold all mutation methods together (internal usage). 
+    # It is guaranteed that, when calling a random mutation, only those that
+    # returns a valid IT will be selected.
+    # Also, the IT used as argument will not be modified.
+
     def __init__(self, minterms: int, maxterms: int, nvars: int, expolim: int, funcsList: FuncsList) -> None:
         self.minterms = minterms
         self.maxterms = maxterms
@@ -145,9 +151,6 @@ class MutationIT:
 
         self.singleITGenerator = _randITBuilder(1, 1, nvars, expolim, funcsList)
     
-        # Será garantido que as mutações internas só serão chamadas se elas puderem retornar uma IT.
-        # Além disso, nenhuma mutação modifica os argumentos passados
-
 
     def _mut_drop(self, ITs: IT) -> IT:
         terms, funcs = ITs
@@ -191,7 +194,6 @@ class MutationIT:
         return ( np.concatenate((terms[mask], newt)), np.concatenate((funcs[mask], newf)) )
 
 
-
     def _mut_interp(self, ITs: IT) -> IT:
         terms, funcs = ITs
 
@@ -221,8 +223,8 @@ class MutationIT:
 
 
     def _mut_interaction(self, combf: Callable) -> Callable:
-        # Recebe também uma funçao para realizar a combinação, e retorna uma funçaõ
-        # que corresponde a uma interação aplicando essa função
+        # Use custom interaction functions to create a new mutation
+        # (in development, performance issues are known).
 
         def _partially(ITs: IT) -> IT:
             terms, funcs = ITs
@@ -233,7 +235,7 @@ class MutationIT:
             newt = np.array([combf(terms[term1_index][i], terms[term2_index][i]) for i in range(self.nvars)])
 
             newt[newt < self.expolim[0]] = self.expolim[0]
-            newt[newt > self.expolim[1]]  = self.expolim[1]
+            newt[newt > self.expolim[1]] = self.expolim[1]
             
             return ( np.concatenate((terms, [newt])), np.concatenate((funcs, [funcs[term1_index]])) )
 
@@ -241,7 +243,9 @@ class MutationIT:
 
 
     def mutate(self, ITs: IT) -> IT:
-        mutations = { #(probabilidade, função de mutação)
+        # Function to apply a mutation over a IT.
+
+        mutations = {
             'term' : self._mut_term,
             'func' : self._mut_func
         }
@@ -255,7 +259,7 @@ class MutationIT:
             mutations['interpos'] = self._mut_interp    #positive
             mutations['interneg'] = self._mut_intern    #negtive
 
-            # Outras ideias de mutação usando interação entre os modelos
+            # Another mutation ideas
             #mutations['intertim'] = self._mut_interaction(lambda x, y: x * y)     #times
             #mutations['interdiv'] = self._mut_interaction(lambda x, y: x // y)    #division
             #mutations['intermax'] = self._mut_interaction(lambda x, y: max(x, y)) #maximum
@@ -264,8 +268,9 @@ class MutationIT:
         return mutations[np.random.choice(list(mutations.keys()))](ITs)
 
 
-# Lista infinita com termos aleatórios
 def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int], funs: FuncsList) -> IT:
+    # Infinite list to create terms. Internal usage.
+
     while True:
         nterms = np.random.randint(minterms, maxterms + 1)
 
@@ -276,32 +281,36 @@ def _randITBuilder(minterms: int, maxterms: int, nvars: int, expolim: Tuple[int]
 
 
 class ITEA:
-    def __init__(self, funs, minterms, maxterms, model, expolim, popsize, gens):
-        self.funs     = funs
-        self.minterms = minterms
-        self.maxterms = maxterms
-        self.model    = model
-        self.expolim  = expolim
-        self.popsize  = popsize
-        self.gens     = gens
+    # Symbolic Regression method.
+
+    def __init__(self, funs, minterms, maxterms, model, expolim, popsize, gens, check_fit=False):
+        self.funs      = funs
+        self.minterms  = minterms
+        self.maxterms  = maxterms
+        self.model     = model
+        self.expolim   = expolim
+        self.popsize   = popsize
+        self.gens      = gens
+        self.check_fit = check_fit
                 
-        # Dicionário para memorizar termos inválidos (DEVE ser resetado sempre que mudar a base de dados)
+        # Memorization used when checking if terms fits or results in NaN.
         self._memory = dict()
 
 
-    # Não é feito dentro da IT pois queremos que elas sejam criadas válidas, 
-    # ao invés de checar no construtor. A ideia é não criar uma IT sem limpar os termos antes,
-    # para garantir que nada será criado sem nenhum termo
-    def _sanitizeIT(self, ITs: IT, funcsList, X: List[List[float]], check_fit=True) -> Union[IT, None]:
-
-        # check fit é para determinar se ele vai tentar fazer um fit e remover termos que tem NaN
-        # durante o fit com a base passada
+    def _sanitizeIT(self, ITs: IT, funcsList, X: List[List[float]]) -> Union[IT, None]:
+        # Cleans an IT expression. The ITExpr class assumes that every IT expression
+        # passed when creating a new instance was cleaned (the creation of
+        # ITExprs manually is disencouraged).
+        # This basicaly removes repeated terms and terms with all exponents==0.
+        # When self.check_fit=True, the cleaning
+        # process will remove every Term that evaluates to NaN/inf. This is useful for
+        # convergence graphics, but preliminary experiments shows that this can impact
+        # negatively on performance (needs further investigations).
 
         terms, funcs = ITs[0], ITs[1]
 
         mask = np.full( len(ITs[0]), False )
 
-        # Removendo termos repetidos
         _, unique_ids = np.unique(np.column_stack((terms, funcs)), return_index=True, axis=0)
 
         for unique_id in unique_ids:
@@ -310,7 +319,7 @@ class ITEA:
             assert f in funcsList.keys(), f'{f} não é uma função válida'
 
             if np.any(t!=0):
-                if check_fit:
+                if self.check_fit:
                     key = (t.tobytes(), f)
                     if key not in self._memory:   
                         Z = funcsList[f](np.prod(X**t, axis=1))
@@ -329,9 +338,8 @@ class ITEA:
         
         pop = []
 
-        # Garantir que a população terá o mesmo tamanho que foi passado
         while len(pop) < self.popsize:
-            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain, True)
+            itxClean = self._sanitizeIT(next(randITGenerator), self.funs, self.Xtrain)
 
             if itxClean:
                 itexpr = ITExpr(itxClean, self.funs)
@@ -344,7 +352,7 @@ class ITEA:
 
     def _mutate(self, ind) -> List[IT]:
 
-        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain, True)
+        itxClean = self._sanitizeIT(self.mutate.mutate((ind.terms, ind.funcs)), self.funs, self.Xtrain)
         
         if itxClean:
             itexpr = ITExpr(itxClean, self.funs)
@@ -357,10 +365,9 @@ class ITEA:
 
     def run(self, Xtrain, ytrain, log=None, verbose=False):
         
-        # Limpa a memorização, que guarda valores de fitness e ajustes de termos
-        # de acordo com a base Xtrain ytrain utilizada
+        # Memorization should be cleaned before every evolution.
         ITExpr._memory = dict()
-        self._memory = dict()
+        self._memory   = dict()
 
         self.Xtrain  = Xtrain
         self.ytrain  = ytrain
@@ -403,34 +410,31 @@ class ITEA:
         return self.best
 
 
-# ---------------------------------------------------------------------------------
+# Example --------------------------------------------------------------------------
 if __name__ == '__main__':
 
-    # Exemplo de uso da regressão simbólica
-    funs: FuncsList = { # Funções devem ser unárias, f:R -> R
+    nvars           = 5 # This value is refered to the used dataset (airfoil)
+    minterms        = 2
+    maxterms        = 10
+    model           = LinearRegression(n_jobs=-1)
+    expolim         = (-1, 3)
+    popsize         = 100
+    gens            = 100
+    funs: FuncsList = { # should be unary functions, f:R -> R
         'sin'      : np.sin,
         'cos'      : np.cos,
         'tan'      : np.tan,
         'abs'      : np.abs,
         'id'       : lambda x: x,
         'sqrt.abs' : lambda x: np.sqrt(np.absolute(x)),
-        'exp'      : lambda x: np.exp(300) if x>=300 else np.exp(x),
-        'log'      : lambda x: 0 if x<=0 else np.log(x)
+        'log'      : np.log, 
+        'exp'      : np.exp,
     }
-
-    # Parâmetros para criar uma ITExpr
-    nvars    = 5 #Isso vem do dataset que será utilizado
-    minterms = 2
-    maxterms = 10
-    model    = LinearRegression(n_jobs=-1)
-    expolim  = (-1, 3)
-    popsize  = 100
-    gens     = 100
 
     dataset = np.loadtxt(f'../datasets/airfoil-train-0.dat', delimiter=',')
     Xtrain, ytrain = dataset[:, :-1], dataset[:, -1]
 
-    symbreg = ITEA(funs, minterms, maxterms, model, expolim, popsize, gens)
+    symbreg = ITEA(funs, minterms, maxterms, model, expolim, popsize, gens, False)
     best    = symbreg.run(Xtrain, ytrain, log='./res.csv', verbose=True)
 
     dataset = np.loadtxt(f'../datasets/airfoil-test-0.dat', delimiter=',')

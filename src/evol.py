@@ -89,8 +89,6 @@ class Evol_operators:
             'func' : self._mut_func
         }
 
-        #print(f'mutação. maxterms={self.max_nof_terms}, expolim={self.expolim}')
-
         if it.len>self.min_nof_terms:
             mutations.update({'drop' : self._mut_drop})
 
@@ -124,18 +122,8 @@ class Evol_operators:
                 picked_t.append(t.copy())
                 picked_f.append(f)
 
-        # print("---")
-        # print(t1, f1)
-        # print(t2, f2)
-        # print(picked_t, picked_f)
-
         it = IT(picked_t, picked_f, label) if len(picked_t)!= 0 else None
 
         ind = Individual(fit_fun, func_set, self.expolim, self.max_nof_terms, it, label)
-
-        # print("---")
-        # print(it1.it.to_str())
-        # print(it2.it.to_str())
-        # print(ind.it.to_str())
 
         return ind
