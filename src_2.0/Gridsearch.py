@@ -201,8 +201,16 @@ class Gridsearch_ITES:
 if __name__ == '__main__':
 
     #select which datasets to use
-    datasets = ['airfoil', 'concrete', 'energyCooling', 'energyHeating',
-        'towerData', 'wineRed', 'wineWhite', 'yacht']    
+    datasets = [
+        'airfoil',
+        #'concrete',
+        #'energyCooling',
+        #'energyHeating',
+        #'towerData',
+        #'wineRed',
+        #'wineWhite',
+        'yacht'
+    ]    
 
     columns = ['dataset','best_params','RMSE_test','NMSE_test','MAE_test','Expression','Fold','Rep']
     
