@@ -21,7 +21,11 @@ Aldeia, G. S. I. and de França, F. O. (2020). A parametric study of interactrio
 Installation and Usage
 ------
 
-Clone or download this repository. The original version (used in the paper) is in the __./src/__ folder.
+Clone or download this repository. We recomend to clone by using
+
+    > git clone --depth=1 --branch=master https://github.com/gAldeia/sensitivity-analysis-ITSR.git sensitivity-analysis-ITSR    
+
+The original version (used in the paper) is in the __./src/__ folder.
 
 A newer version is in __./src_2.0/__.
 
