@@ -234,7 +234,7 @@ if __name__ == '__main__':
             dataset = np.loadtxt(f'../datasets/{ds}-test-{fold}.dat', delimiter=',')
             Xtest, ytest = dataset[:, :-1], dataset[:, -1]
             
-            for rep in range(1): #Número de execuções por fold
+            for rep in range(2): #Número de execuções por fold
 
                 if os.path.isfile(fname):
                     resultsDF = pd.read_csv(fname)
