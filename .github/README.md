@@ -1,6 +1,9 @@
 Sensitivity Analysis of Interaction-Transformation Evolutionary Algorithm for Symbolic Regression
 ======
 
+> **OBS:** although there is a standalone implementation of ITEA in this repository, it is not the newest version, and is outdated. This specific implementation was made to serve the specific purpose of the paper.
+> I highly recommend to use the [high-performing Haskell version (that comes with a python wrapper)](https://github.com/folivetti/ITEA) by [@folivetti](https://github.com/folivetti/ITEA), or to use [my most updated version](https://github.com/gAldeia/itea-python) (the only one that I am maintaining).
+
 Repository containing the code for performing and saving a sensitivity analysis of the hyper-parameters for the algorithm based on the Interaction-Transformation (IT) representation, as well as a python notebook to plot results helping visualizing the results.
 
 The aim is to answer the following questions:
@@ -11,8 +14,8 @@ The aim is to answer the following questions:
 
 ### Paper abstract
 
-> **The balance between approximation error and model complexity is an important trade-off for Symbolic Regression algorithms. This trade-off is achieved by means of specific operators for bloat control, modified operators,  limits to the size of the generated expressions and multi-objective optimization.**
-> **Recently, the representation Interaction-Transformation was introduced with the goal of limiting the search space to simpler expressions, thus avoiding bloating. This representation was used in the context of an Evolutionary Algorithm in order to find concise expressions resulting in small approximation errors competitive with the literature. Particular to this algorithm, two parameters control the complexity of the generated expression. This paper investigates the influence of those parameters w.r.t. the goodness-of-fit. Through some extensive experiments, we find that  _max_terms_ is more important to control goodness-of-fit but also that there is a limit to which increasing its value renders any benefits. Also, since _expolim_ has a smaller influence to the results it can be set to a default value without impacting the final results.**
+> The balance between approximation error and model complexity is an important trade-off for Symbolic Regression algorithms. This trade-off is achieved by means of specific operators for bloat control, modified operators,  limits to the size of the generated expressions and multi-objective optimization.
+> Recently, the representation Interaction-Transformation was introduced with the goal of limiting the search space to simpler expressions, thus avoiding bloating. This representation was used in the context of an Evolutionary Algorithm in order to find concise expressions resulting in small approximation errors competitive with the literature. Particular to this algorithm, two parameters control the complexity of the generated expression. This paper investigates the influence of those parameters w.r.t. the goodness-of-fit. Through some extensive experiments, we find that  _max_terms_ is more important to control goodness-of-fit but also that there is a limit to which increasing its value renders any benefits. Also, since _expolim_ has a smaller influence to the results it can be set to a default value without impacting the final results.
 
 > **Keywords: parametric analysis, evolutionary algorithms, symbolic regression.**
   
